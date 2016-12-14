@@ -1,18 +1,24 @@
 import com.google.gson.GsonBuilder;
 import okhttp3.*;
-import org.jsoup.Jsoup;
+import org.jsoup.*;
+import org.jsoup.Connection;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.nodes.TextNode;
 import org.jsoup.select.Elements;
+import org.jsoup.select.Evaluator;
 
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.time.format.ResolverStyle;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 
 public class DiscovrCrawler {
@@ -80,8 +86,16 @@ public class DiscovrCrawler {
 
                     // Find the location, if not ignore this event
                     String location = text.get(1).text();
-                    if (location == "See description") {
+                    if (location.equals("See description")) {
                         System.out.println("Ignoring event that requires us to crawl more...");
+                        continue;
+                    }
+                    if(location.contains("Okanagan")){
+                        System.out.println("Ignoring UBC Oakanagan locations...");
+                        continue;
+                    }
+                    if(location.contains("Point Grey")){
+                        System.out.println("Ignoring campus wide events");
                         continue;
                     }
 
@@ -98,6 +112,11 @@ public class DiscovrCrawler {
                     } else {
                         // This event has a specific time range
                         String[] startEndTimes = time.split(" - ");
+
+                        if(startEndTimes.length != 2){
+                            continue;
+                        }
+
                         String startTime = startEndTimes[0];
                         String endTime = startEndTimes[1];
 
@@ -126,13 +145,14 @@ public class DiscovrCrawler {
         for (Event e : events) {
             String jsonEvent = builder.create().toJson(e);
             System.out.println(jsonEvent);
-//            try {
-//                System.out.println(postEventToDatabase(jsonEvent));
-//            } catch (IOException ioException) {
-//                ioException.printStackTrace();
-//            }
+            try {
+                System.out.println(postEventToDatabase(jsonEvent));
+            } catch (IOException ioException) {
+                ioException.printStackTrace();
+            }
 
         }
+
 
     }
 
@@ -152,6 +172,23 @@ public class DiscovrCrawler {
 
         Response response = CLIENT.newCall(request).execute();
         return response.body().string();
+    }
+
+    public static void deleteEventInDatabase(ArrayList<Integer> targets){
+        for(Integer i : targets){
+            Request request = new Request.Builder()
+                    .url(DISCOVR_URL+"/"+i)
+                    .delete()
+                    .build();
+
+            try {
+                Response response = CLIENT.newCall(request).execute();
+                System.out.println(response.isSuccessful());
+                System.out.println(response.body().string());
+            }catch (IOException e){
+                e.printStackTrace();
+            }
+        }
     }
 
 }
