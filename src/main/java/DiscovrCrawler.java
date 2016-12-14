@@ -1,24 +1,18 @@
 import com.google.gson.GsonBuilder;
 import okhttp3.*;
-import org.jsoup.*;
-import org.jsoup.Connection;
+import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.nodes.TextNode;
 import org.jsoup.select.Elements;
-import org.jsoup.select.Evaluator;
 
 import java.io.IOException;
-import java.io.InterruptedIOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
-import java.time.format.ResolverStyle;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
 
 public class DiscovrCrawler {
@@ -30,11 +24,14 @@ public class DiscovrCrawler {
     private static final MediaType MEDIA_TYPE_JSON = MediaType.parse("application/json");
     private static final DateTimeFormatter FORMATTER_12_HOUR = DateTimeFormatter.ofPattern("h:mm a");
 
+
+    public static void main(String[] args) {
+        deleteEventInDatabase(94, 98, 99);
+    }
     /**
      * Crawl the UBC events calendar and scrap the page for event data, submitting the results to our backend.
-     * @param args
      */
-    public static void main(String[] args) {
+    public static void crawlCalendar() {
         // Determine today's date and increment it when moving to a new event day list
         LocalDate baseDate = LocalDate.now();
 
@@ -73,7 +70,7 @@ public class DiscovrCrawler {
                     String description = element.getElementsByClass("popDescription").text();
 
                     // Limit the description to 512 characters for the database
-                    if(description.length() >= 512){
+                    if (description.length() >= 512) {
                         description = description.substring(0, 512);
                     }
 
@@ -90,11 +87,11 @@ public class DiscovrCrawler {
                         System.out.println("Ignoring event that requires us to crawl more...");
                         continue;
                     }
-                    if(location.contains("Okanagan")){
+                    if (location.contains("Okanagan")) {
                         System.out.println("Ignoring UBC Oakanagan locations...");
                         continue;
                     }
-                    if(location.contains("Point Grey")){
+                    if (location.contains("Point Grey")) {
                         System.out.println("Ignoring campus wide events");
                         continue;
                     }
@@ -113,7 +110,7 @@ public class DiscovrCrawler {
                         // This event has a specific time range
                         String[] startEndTimes = time.split(" - ");
 
-                        if(startEndTimes.length != 2){
+                        if (startEndTimes.length != 2) {
                             continue;
                         }
 
@@ -174,10 +171,15 @@ public class DiscovrCrawler {
         return response.body().string();
     }
 
-    public static void deleteEventInDatabase(ArrayList<Integer> targets){
-        for(Integer i : targets){
+    /**
+     * Remove an event from the database given its ID
+     *
+     * @param targets - List of Events ID to remove.
+     */
+    public static void deleteEventInDatabase(int... targets) {
+        for (Integer i : targets) {
             Request request = new Request.Builder()
-                    .url(DISCOVR_URL+"/"+i)
+                    .url(DISCOVR_URL + "/" + i)
                     .delete()
                     .build();
 
@@ -185,7 +187,7 @@ public class DiscovrCrawler {
                 Response response = CLIENT.newCall(request).execute();
                 System.out.println(response.isSuccessful());
                 System.out.println(response.body().string());
-            }catch (IOException e){
+            } catch (IOException e) {
                 e.printStackTrace();
             }
         }
