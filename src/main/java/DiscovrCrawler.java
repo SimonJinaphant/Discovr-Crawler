@@ -24,11 +24,14 @@ public class DiscovrCrawler {
     private static final MediaType MEDIA_TYPE_JSON = MediaType.parse("application/json");
     private static final DateTimeFormatter FORMATTER_12_HOUR = DateTimeFormatter.ofPattern("h:mm a");
 
+
+    public static void main(String[] args) {
+        deleteEventInDatabase(94, 98, 99);
+    }
     /**
      * Crawl the UBC events calendar and scrap the page for event data, submitting the results to our backend.
-     * @param args
      */
-    public static void main(String[] args) {
+    public static void crawlCalendar() {
         // Determine today's date and increment it when moving to a new event day list
         LocalDate baseDate = LocalDate.now();
 
@@ -67,7 +70,7 @@ public class DiscovrCrawler {
                     String description = element.getElementsByClass("popDescription").text();
 
                     // Limit the description to 512 characters for the database
-                    if(description.length() >= 512){
+                    if (description.length() >= 512) {
                         description = description.substring(0, 512);
                     }
 
@@ -80,8 +83,16 @@ public class DiscovrCrawler {
 
                     // Find the location, if not ignore this event
                     String location = text.get(1).text();
-                    if (location == "See description") {
+                    if (location.equals("See description")) {
                         System.out.println("Ignoring event that requires us to crawl more...");
+                        continue;
+                    }
+                    if (location.contains("Okanagan")) {
+                        System.out.println("Ignoring UBC Oakanagan locations...");
+                        continue;
+                    }
+                    if (location.contains("Point Grey")) {
+                        System.out.println("Ignoring campus wide events");
                         continue;
                     }
 
@@ -98,6 +109,11 @@ public class DiscovrCrawler {
                     } else {
                         // This event has a specific time range
                         String[] startEndTimes = time.split(" - ");
+
+                        if (startEndTimes.length != 2) {
+                            continue;
+                        }
+
                         String startTime = startEndTimes[0];
                         String endTime = startEndTimes[1];
 
@@ -126,13 +142,14 @@ public class DiscovrCrawler {
         for (Event e : events) {
             String jsonEvent = builder.create().toJson(e);
             System.out.println(jsonEvent);
-//            try {
-//                System.out.println(postEventToDatabase(jsonEvent));
-//            } catch (IOException ioException) {
-//                ioException.printStackTrace();
-//            }
+            try {
+                System.out.println(postEventToDatabase(jsonEvent));
+            } catch (IOException ioException) {
+                ioException.printStackTrace();
+            }
 
         }
+
 
     }
 
@@ -152,6 +169,28 @@ public class DiscovrCrawler {
 
         Response response = CLIENT.newCall(request).execute();
         return response.body().string();
+    }
+
+    /**
+     * Remove an event from the database given its ID
+     *
+     * @param targets - List of Events ID to remove.
+     */
+    public static void deleteEventInDatabase(int... targets) {
+        for (Integer i : targets) {
+            Request request = new Request.Builder()
+                    .url(DISCOVR_URL + "/" + i)
+                    .delete()
+                    .build();
+
+            try {
+                Response response = CLIENT.newCall(request).execute();
+                System.out.println(response.isSuccessful());
+                System.out.println(response.body().string());
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
 }
